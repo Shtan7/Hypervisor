@@ -113,21 +113,21 @@ namespace hh
       return *this;
     }
 
-    hook_context::self& hook_context::unset_read() noexcept
+    hook_context::self& hook_context::set_read() noexcept
     {
       page_hook_mask |= ept::page_attrib::read;
 
       return *this;
     }
 
-    hook_context::self& hook_context::unset_write() noexcept
+    hook_context::self& hook_context::set_write() noexcept
     {
       page_hook_mask |= ept::page_attrib::write;
 
       return *this;
     }
 
-    hook_context::self& hook_context::unset_exec() noexcept
+    hook_context::self& hook_context::set_exec() noexcept
     {
       page_hook_mask |= ept::page_attrib::exec;
 
