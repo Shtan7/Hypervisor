@@ -72,9 +72,9 @@ namespace hh
 
     public:
       hook_context(void* target_address) noexcept;
-      self& unset_read() noexcept;
-      self& unset_write() noexcept;
-      self& unset_exec() noexcept;
+      self& set_read() noexcept;
+      self& set_write() noexcept;
+      self& set_exec() noexcept;
       self& set_functions(void* hook_function, void** orig_function) noexcept;
       virtual ~hook_context() noexcept = default;
     };

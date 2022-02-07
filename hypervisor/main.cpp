@@ -28,7 +28,7 @@ void setup_hooks()
 
   globals::hook_builder->ept_hook(
     hook::hook_context{ hook::get_address_by_ssdt(hook::ssdt_numbers::NtCreateFile, false, system_process_base->Base) }
-    .unset_exec()
+    .set_exec()
     .set_functions(hh::NtCreateFile, reinterpret_cast<void**>(&hh::hook::pointers::NtCreateFileOrig)));
 }
 

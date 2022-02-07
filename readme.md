@@ -43,11 +43,12 @@ Hypervisor - это гипервизор второго типа, который
 
 Для реализации данной фичи используется возможность эмуляции MMIO при помощи EPT технологии.
 У целевой страницы с кодом создается двойник, который будет указывать на измененную версию кода
-с хуком в начале функции. У оригинальной страницы убирается бит доступа, позволяющий исполнение
-и при попытке запуска кода происходит EPT violation, которое ловит гипервизор. Далее осуществляется
-временная подмена оригинальной страницы на измененную. Таким образом достигается поведение, при котором
-при доступе к одному виртуальному адресу в разных обстоятельствах можно получить разный физический адрес без
-триггера Patch Guard. 
+с хуком в начале функции. Целевая страница заменяется измененной, а так же убирается бит доступа 
+на чтение и запись, но оставляется бит доступа на исполнение. При попытке чтения хукнутого кода 
+(например при проверке целостности ядра Patch Guard'ом) происходит EPT violation, которое ловит 
+гипервизор. Далее осуществляется временный подмен измененной версии страницы на оригинальную. 
+Таким образом достигается поведение, при котором при доступе к одному виртуальному адресу в разных 
+обстоятельствах можно получить разный физический адрес.
 
 Для демонстрации EPT хука в main.cpp в setup_hooks происходит хук SSDT функции 'NtCreateFile'.
 Оригинальная функция подменяется хукнутой, в которой осуществляется проверка имени открываемого
@@ -100,9 +101,10 @@ to use the hypervisor without having to put Windows into test mode, where driver
 ## About stealth hooks of executable code.
 
 To implement this feature, MMIO emulation with EPT is used. A copy with a hook is created for the original page.
-Hypervisor clears the original page's execution bit. This leads to EPT violations that the hypervisor catches.
-Next, a temporary replacement of the original page with its copy is performed. Thus, one virtual address leads to 
-different physical addresses in different conditions.
+Hypervisor clears the target page's read and write bits and replaces it with the clone. Such a page can be freely 
+executed, but not read. When Patch Guard checks the integrity of the kernel a read is attempted and an EPT violation 
+occurs. After that, the hypervisor temporarily replaces the changed page with the original one. Thus, one virtual 
+address leads to different physical addresses in different conditions.
 
 In main.cpp you can find example of this technique. setup_hooks performs hook of the SSDT function 'NtCreateFile'.
 New function checks object's name. If it contains substring 'open_me' then function returns status 'ACCESS_DENIED'.
