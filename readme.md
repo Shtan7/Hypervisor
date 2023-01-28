@@ -29,7 +29,7 @@ Hypervisor - это гипервизор второго типа, который
 
 В виду невозможности использования стандартных путей аллокации памяти в некоторых частях кода, 
 а именно в тех, которые исполняются в так называемом root моде (режим с выключенными прерываниями), 
-был реализован простейший кастомный аллокатор, основанный на buddy memory allocation алгоритме.
+был реализован простейший кастомный аллокатор, основанный на TLSF allocator алгоритме.
 
 В проекте заданы настройки сборки, которые генерируют исполняемый образ, поддерживающий
 запуск кода при помощи техники 'driver manual mapping', что накладывает на код определенные
@@ -90,7 +90,7 @@ Links to repositories from which the port of C++ exceptions was taken:
 - https://github.com/avakar/vcrtl
 
 You can't use standard ways of memory allocation in hypervisor root mode, so simple memory 
-allocator was implemented. Allocator uses 'buddy memory allocation' algorithm.
+allocator was implemented. Allocator uses 'TLSF allocator' algorithm.
 
 The project generates an executable image that can be run using manual mapping.
 This imposes certain restrictions on the code. You can't create device object for I\O operations 
