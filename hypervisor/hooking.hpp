@@ -2,11 +2,10 @@
 #include <ntddk.h>
 #include "lde.hpp"
 #include "common.hpp"
-#include <stdint.h>
-#include <list>
+#include <cstdint>
 #include <string>
-#include "win.hpp"
 #include "delete_constructors.hpp"
+#include <map>
 
 namespace hh
 {
@@ -20,6 +19,19 @@ namespace hh
     struct hooked_page_detail;
   }
 
+  // What access bits should be in EPT entry.
+  union page_attribs
+  {
+    struct
+    {
+      uint8_t read : 1;
+      uint8_t write : 1;
+      uint8_t exec : 1;
+    };
+
+    uint8_t all;
+  };
+
   namespace hook
   {
     struct pattern_entry
@@ -30,7 +42,7 @@ namespace hh
 
     namespace patterns
     {
-      inline constexpr pattern_entry ssdt_shadow_table{ "\x4C\x8D\x1D\x00\x00\x00\x00\xF7\x43\x78\x80\x00\x00\x00", "xxx????xxxxxxx" };
+      inline constexpr pattern_entry ssdt_shadow_table{ "\x4C\x8D\x1D\x00\x00\x00\x00\xF7\x43\x00\x00\x00\x00\x00", "xxx????xx?????" };
     }
 
     namespace pointers
@@ -59,31 +71,31 @@ namespace hh
       friend class hook_builder;
 
     public:
-      common::directory_base_guard* dir_base = {};
-      uint8_t* target_address;
-      void* hook_function;
-      void** orig_function;
-      x86::cr3_t new_cr3 = {};
-      uint32_t page_hook_mask;
-
-    protected:
-      virtual void pre_hook_callback();
-      virtual void post_hook_callback();
+      uint8_t* target_address_;
+      void* hook_function_;
+      void** orig_function_;
+      x86::cr3_t old_cr3_;
+      page_attribs attributes;
 
     public:
-      hook_context(void* target_address) noexcept;
+      hook_context(x86::cr3_t cr3 = {}) noexcept;
+      hook_context(const hook_context&) noexcept = default;
+      hook_context(hook_context&&) noexcept = default;
+      hook_context& operator=(const hook_context&) noexcept = default;
+      hook_context& operator=(hook_context&&) noexcept = default;
+      self& set_target_address(void* target_address) noexcept;
       self& set_read() noexcept;
       self& set_write() noexcept;
       self& set_exec() noexcept;
       self& set_functions(void* hook_function, void** orig_function) noexcept;
-      virtual ~hook_context() noexcept = default;
+      virtual ~hook_context() noexcept;
     };
 
     // Performs ept hooks.
     class hook_builder : non_relocatable
     {
     protected:
-      std::list<ept::hooked_page_detail> hooked_pages_list_;
+      std::map<uint64_t, ept::hooked_page_detail> hooked_pages_list_;
       disassembler lde_;
 
     protected:

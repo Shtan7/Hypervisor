@@ -5,6 +5,7 @@
 #include <array>
 #include "delete_constructors.hpp"
 #include "common.hpp"
+#include "tlsf.h"
 
 namespace hh
 {
@@ -21,40 +22,48 @@ namespace hh
     virtual ~memory_manager() = default;
   };
 
-  // Simple allocator that uses buddy allocation algorithm.
-  class buddy_allocator : public memory_manager
+  template<unsigned int DefaultSize = 0x1000 * 1525>
+  class tlsf_allocator : public memory_manager
   {
   private:
-    struct node
-    {
-      node* next;
-    };
-
-    struct header
-    {
-      uint64_t size;
-    };
-
-  private:
-    std::map<uint64_t, uint64_t> aligned_allocations_;
-    std::size_t size_;
-    void* start_address_;
-    static constexpr uint64_t c_log2_header = common::compile_time_log2(sizeof(header));
-    std::array<node*, std::numeric_limits<uint64_t>::digits - c_log2_header> buckets_ = {};
-    volatile long map_lock_ = {};
-
-  private:
-    void init() noexcept;
+    tlsf_t service_data_;
+    size_t pool_size_;
+    void* pool_ptr_;
 
   public:
-    static constexpr uint32_t c_total_number_of_pages = 0x1E06;
+    tlsf_allocator() : service_data_{}, pool_size_{ DefaultSize }, pool_ptr_{}
+    {
+      pool_ptr_ = ExAllocatePoolWithTag(NonPagedPool, pool_size_, common::pool_tag);
+      service_data_ = tlsf_create_with_pool(pool_ptr_, pool_size_);
+    }
 
-  public:
-    void* allocate(uint32_t allocation_size) override;
-    void deallocate(void* ptr_to_allocation) override;
-    void deallocate_internal(void* ptr_to_allocation);
-    void* allocate_align(uint32_t allocation_size, std::align_val_t align) override;
-    buddy_allocator(uint32_t size);
-    virtual ~buddy_allocator();
+    tlsf_allocator(size_t pool_size) : service_data_{}, pool_size_{ pool_size }, pool_ptr_{}
+    {
+      pool_ptr_ = ExAllocatePoolWithTag(NonPagedPool, pool_size_, common::pool_tag);
+      service_data_ = tlsf_create_with_pool(pool_ptr_, pool_size_);
+    }
+
+    void* allocate(uint32_t allocation_size) override
+    {
+      common::spinlock_guard _ = { &spinlock_ };
+      return tlsf_malloc(service_data_, allocation_size);
+    }
+
+    void* allocate_align(uint32_t allocation_size, std::align_val_t align) override
+    {
+      common::spinlock_guard _ = { &spinlock_ };
+      return tlsf_memalign(service_data_, static_cast<size_t>(align), allocation_size);
+    }
+
+    void deallocate(void* ptr_to_allocation) override
+    {
+      common::spinlock_guard _ = { &spinlock_ };
+      tlsf_free(service_data_, ptr_to_allocation);
+    }
+
+    ~tlsf_allocator() override
+    {
+      ExFreePoolWithTag(pool_ptr_, common::pool_tag);
+    }
   };
 }

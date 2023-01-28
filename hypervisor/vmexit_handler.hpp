@@ -1,7 +1,6 @@
 #pragma once
 #include "delete_constructors.hpp"
 #include "common.hpp"
-#include <vector>
 
 namespace hh
 {
@@ -85,9 +84,13 @@ namespace hh
       virtual void handle_xsaves(common::guest_regs* regs, vcpu* cpu_obj);
       virtual void handle_xrstors(common::guest_regs* regs, vcpu* cpu_obj);
       virtual void handle_pcommit(common::guest_regs* regs, vcpu* cpu_obj);
+      virtual void handle_virtualized_eoi(common::guest_regs* regs, vcpu* cpu_obj);
+      virtual void handle_vmfunc(common::guest_regs* regs, vcpu* cpu_obj);
+      virtual void handle_encls(common::guest_regs* regs, vcpu* cpu_obj);
+      virtual void handle_page_modification_log_full(common::guest_regs* regs, vcpu* cpu_obj);
 
       // Do absolutely nothing.
-      void handler_stub(common::guest_regs* regs) noexcept;
+      void handler_stub(common::guest_regs* regs, vcpu* cpu_obj) noexcept;
 
     protected:
 

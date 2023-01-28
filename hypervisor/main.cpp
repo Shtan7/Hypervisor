@@ -27,7 +27,8 @@ void setup_hooks()
   */
 
   globals::hook_builder->ept_hook(
-    hook::hook_context{ hook::get_address_by_ssdt(hook::ssdt_numbers::NtCreateFile, false, system_process_base->Base) }
+    hook::hook_context{}
+    .set_target_address(hook::get_address_by_ssdt(hook::ssdt_numbers::NtCreateFile, false, system_process_base->Base))
     .set_exec()
     .set_functions(hh::NtCreateFile, reinterpret_cast<void**>(&hh::hook::pointers::NtCreateFileOrig)));
 }
@@ -36,11 +37,11 @@ NTSTATUS entry_point()
 {
   __crt_init();
 
-  globals::processor_count = KeQueryActiveProcessorCount(0);
+  globals::processor_count = KeQueryActiveProcessorCount(nullptr);
 
   try
   {
-    globals::mem_manager = new buddy_allocator(buddy_allocator::c_total_number_of_pages * PAGE_SIZE);
+    globals::mem_manager = new tlsf_allocator();
 
     hv_operations::initialize_hypervisor();
     setup_hooks();
@@ -62,7 +63,7 @@ NTSTATUS entry_point()
 
     hv_operations::launch_on_all_cores([]()
       {
-        x86::cr4_t cr4 = x86::read<x86::cr4_t>();
+        auto cr4 = x86::read<x86::cr4_t>();
         cr4.flags.vmx_enable = 0;
         x86::write<x86::cr4_t>(cr4);
       });

@@ -18,7 +18,7 @@ namespace hh
 
   namespace ept
   {
-    class pt_handler;
+    class ept_handler;
   }
 
   class vcpu : non_relocatable
@@ -28,7 +28,7 @@ namespace hh
     std::shared_ptr<hv_event_handlers::vmexit_handler> vmexit_handler_;
     common::fxsave_area* fxsave_area_;
 
-  private:
+  public:
 
     /* Read only fields */
 
@@ -67,8 +67,6 @@ namespace hh
     vmx::exception_bitmap exception_bitmap() const noexcept;
     void exception_bitmap(vmx::exception_bitmap exception_bitmap) noexcept;
 
-  public:
-
     /* Exit state */
 
     vmx::instruction_error vm_instruction_error() const noexcept;
@@ -95,8 +93,6 @@ namespace hh
     uint64_t exit_guest_linear_address() const noexcept;
 
     common::fxsave_area* fxsave_area() noexcept;
-
-  private:
 
     /* Host state */
 
@@ -138,8 +134,6 @@ namespace hh
     uint64_t host_sysenter_eip() const noexcept;
     void host_sysenter_esp(uint64_t value) noexcept;
     uint64_t host_sysenter_esp() const noexcept;
-
-  public:
 
     /* Guest state */
 

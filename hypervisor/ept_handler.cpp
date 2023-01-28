@@ -6,18 +6,18 @@
 #include "invept.hpp"
 #include "vmcall.hpp"
 #include "x86-64.hpp"
-#include "pt_handler.hpp"
+#include "ept_handler.hpp"
 
 namespace hh
 {
   namespace ept
   {
-    pt_handler::pt_handler()
+    ept_handler::ept_handler() : ept_state_{}, pml1_modification_and_invalidation_lock_{}
     {
       is_ept_features_supported();
     }
 
-    void pt_handler::is_ept_features_supported() const
+    void ept_handler::is_ept_features_supported() const
     {
       const x86::msr::vmx_ept_vpid_cap_register_t vpid_register = x86::msr::read<x86::msr::vmx_ept_vpid_cap_register_t>();
       const x86::msr::def_type_register_t mttr_def_type = x86::msr::read<x86::msr::def_type_register_t>();
@@ -26,12 +26,12 @@ namespace hh
         || !vpid_register.flags.pde_2mb_pages)
       {
         throw std::exception{ "The processor doesn't support some of next flags:"
-          "page_walk_length_4, memory_type_write_back, pde_2mb_pages.\n" };
+          "page_walk_length_4, memory_type_write_back, pde_2mb_pages." };
       }
 
       if (!vpid_register.flags.advanced_vmexit_ept_violations_information)
       {
-        throw std::exception{ "The processor doesn't report advanced VM-exit information for EPT violations.\n" };
+        throw std::exception{ "The processor doesn't report advanced VM-exit information for EPT violations." };
       }
 
       if (!vpid_register.flags.execute_only_pages)
@@ -41,18 +41,18 @@ namespace hh
 
       if (!mttr_def_type.flags.mtrr_enable)
       {
-        throw std::exception{ "Dynamic ranges not supported.\n" };
+        throw std::exception{ "Dynamic ranges not supported." };
       }
 
       KdPrint(("All ept related features are present.\n"));
     }
 
-    eptp pt_handler::get_eptp() const noexcept
+    eptp ept_handler::get_eptp() const noexcept
     {
       return ept_state_.ept_pointer;
     }
 
-    void pt_handler::notify_all_to_invalidate_ept() const noexcept
+    void ept_handler::notify_all_to_invalidate_ept() const noexcept
     {
       KeIpiGenericCall([](uint64_t context) -> uint64_t
         {
@@ -69,10 +69,8 @@ namespace hh
         }, ept_state_.ept_pointer.flags);
     }
 
-    void pt_handler::split_large_page(std::shared_ptr<ept::vmm::dynamic_split> pre_allocated_buff, uint64_t physical_address)
+    void ept_handler::split_large_page(std::shared_ptr<ept::vmm::dynamic_split> pre_allocated_buff, uint64_t physical_address)
     {
-      using namespace ept;
-
       pml2_entry* target_entry = get_pml2_entry(physical_address);
 
       // If this large page is not marked a large page, that means it's a pointer already.
@@ -110,10 +108,8 @@ namespace hh
       RtlCopyMemory(target_entry, &new_pointer, sizeof(new_pointer));
     }
 
-    ept::pml2_entry* pt_handler::get_pml2_entry(uint64_t physical_address)
+    ept::pml2_entry* ept_handler::get_pml2_entry(uint64_t physical_address)
     {
-      using namespace ept;
-
       const uint64_t directory = ADDRMASK_EPT_PML2_INDEX(physical_address);
       const uint64_t directory_pointer = ADDRMASK_EPT_PML3_INDEX(physical_address);
       const uint64_t pml4_entry = ADDRMASK_EPT_PML4_INDEX(physical_address);
@@ -127,10 +123,8 @@ namespace hh
       return &ept_state_.ept_page_table->pml2[directory_pointer][directory];
     }
 
-    pml1_entry* pt_handler::get_pml1_entry(uint64_t physical_address)
+    pml1_entry* ept_handler::get_pml1_entry(uint64_t physical_address)
     {
-      using namespace ept;
-
       const uint64_t directory = ADDRMASK_EPT_PML2_INDEX(physical_address);
       const uint64_t directory_pointer = ADDRMASK_EPT_PML3_INDEX(physical_address);
       const uint64_t pml4_entry = ADDRMASK_EPT_PML4_INDEX(physical_address);
@@ -165,7 +159,7 @@ namespace hh
       return pml1;
     }
 
-    void pt_handler::set_pml1_and_invalidate_tlb(pml1_entry* entry_address, pml1_entry entry_value, vmx::invept_type invalidation_type) noexcept
+    void ept_handler::set_pml1_and_invalidate_tlb(pml1_entry* entry_address, pml1_entry entry_value, vmx::invept_type invalidation_type) noexcept
     {
       const common::spinlock_guard lock{ &pml1_modification_and_invalidation_lock_ };
 
@@ -181,7 +175,7 @@ namespace hh
       }
     }
 
-    void pt_handler::initialize_ept()
+    void ept_handler::initialize_ept()
     {
       build_mttr_map();
       create_identity_page_table();
@@ -207,7 +201,7 @@ namespace hh
       ept_state_.ept_pointer = eptp;
     }
 
-    void pt_handler::setup_pml2_entry(pml2_entry* new_entry, uint64_t page_frame_number) const noexcept
+    void ept_handler::setup_pml2_entry(pml2_entry* new_entry, uint64_t page_frame_number) const noexcept
     {
       /*
       Each of the 512 collections of 512 PML2 entries is setup here.
@@ -263,7 +257,7 @@ namespace hh
       new_entry->memory_type = static_cast<uint64_t>(target_memory_type);
     }
 
-    void pt_handler::create_identity_page_table()
+    void ept_handler::create_identity_page_table()
     {
       // Allocate address anywhere in the OS's memory space
       const PHYSICAL_ADDRESS max_size = { .QuadPart = static_cast<long long>((std::numeric_limits<unsigned long long>::max)()) };
@@ -334,13 +328,12 @@ namespace hh
       ept_state_.ept_page_table = page_table;
     }
 
-    void pt_handler::build_mttr_map() noexcept
+    void ept_handler::build_mttr_map() noexcept
     {
       const x86::msr::mttr_capabilities_register_t mttr_cap = x86::msr::read<x86::msr::mttr_capabilities_register_t>();
 
       x86::msr::mtrr_physbase_register_t current_phys_base;
       x86::msr::mtrr_physmask_register_t current_phys_mask;
-      mttr_range_descriptor descriptor;
 
       for (uint32_t current_register = 0; current_register < mttr_cap.flags.variable_range_count; current_register++)
       {
@@ -353,7 +346,7 @@ namespace hh
         {
           // We only need to read these once because the ISA dictates that MTRRs are to be synchronized between all processors
           // during BIOS initialization.
-          descriptor = ept_state_.memory_ranges[ept_state_.number_of_enabled_memory_ranges++];
+          mttr_range_descriptor descriptor = ept_state_.memory_ranges[ept_state_.number_of_enabled_memory_ranges++];
 
           // Calculate the base address in bytes
           descriptor.physical_base_address = current_phys_base.flags.page_frame_number * PAGE_SIZE;
@@ -384,7 +377,7 @@ namespace hh
     }
   }
 
-  ept::pt_handler::~pt_handler() noexcept
+  ept::ept_handler::~ept_handler() noexcept
   {
     if (ept_state_.ept_page_table)
     {
