@@ -7,7 +7,7 @@ namespace hh
 
   namespace ept
   {
-    class pt_handler;
+    class ept_handler;
   }
 
   namespace hook
@@ -19,7 +19,7 @@ namespace hh
 namespace globals
 {
   inline hh::memory_manager* mem_manager = {};
-  inline hh::ept::pt_handler* pt_handler = {};
+  inline hh::ept::ept_handler* pt_handler = {};
   inline int processor_count = {};
   inline hh::hook::hook_builder* hook_builder = {};
   inline hh::vcpu* vcpus = {};

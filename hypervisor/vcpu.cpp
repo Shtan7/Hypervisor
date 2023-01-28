@@ -1,5 +1,5 @@
 #include "vcpu.hpp"
-#include "pt_handler.hpp"
+#include "ept_handler.hpp"
 #include "vpid.hpp"
 #include "globals.hpp"
 #include "x86-64.hpp"
@@ -8,10 +8,9 @@
 
 namespace hh
 {
-  vcpu::vcpu(std::shared_ptr<hv_event_handlers::vmexit_handler> vmexit_handler) noexcept : vmexit_handler_ { vmexit_handler }
-  {
-    fxsave_area_ = new (std::align_val_t{ 16 }) common::fxsave_area;
-  }
+  vcpu::vcpu(std::shared_ptr<hv_event_handlers::vmexit_handler> vmexit_handler) noexcept : guest_state_{},
+    vmexit_handler_ { vmexit_handler }, fxsave_area_{ new (std::align_val_t{ 16 }) common::fxsave_area }
+  {}
 
   void vcpu::allocate_vmx_regions()
   {
@@ -46,7 +45,8 @@ namespace hh
 
     if (clear_status)
     {
-      throw std::exception{ "VMCS clearing failed with status %d\n" };
+      KdPrint(("VMCLEAR status = %d\n", clear_status));
+      throw std::exception{ "VMCS clearing failed." };
     }
   }
 
@@ -56,7 +56,8 @@ namespace hh
 
     if (vmptrld_status)
     {
-      throw std::exception{ "VMPTRLD failed with status %d\n" };
+      KdPrint(("VMPTRLD status = %d\n", vmptrld_status));
+      throw std::exception{ "VMPTRLD failed." };
     }
   }
 
@@ -205,7 +206,8 @@ namespace hh
 
     auto error = vm_instruction_error();
 
-    throw std::exception{ (std::string{"VMLAUNCH error : "} + vmx::to_string(error)).c_str() };
+    KdPrint(("VMLAUNCH string error: %s\n", vmx::to_string(error)));
+    throw std::exception{ "VMLAUNCH error." };
   }
 
   void vcpu::set_msr_bitmap(uint64_t msr, bool read_detection, bool write_detection)
@@ -213,7 +215,7 @@ namespace hh
     if (!read_detection && !write_detection)
     {
       // Invalid command
-      throw std::exception{ "Invalid msr read / write flag combination.\n" };
+      throw std::exception{ "Invalid msr read / write flag combination." };
     }
 
     if (msr <= x86::msr::low_msr_high_range)
@@ -245,13 +247,14 @@ namespace hh
     }
     else
     {
-      throw std::exception{ "Invalid msr range.\n" };
+      throw std::exception{ "Invalid msr range." };
     }
   }
 
   void vcpu::allocate_msr_bitmap()
   {
     guest_state_.msr_bitmap_virtual_address = ExAllocatePoolWithTag(NonPagedPool, PAGE_SIZE, common::pool_tag);
+    RtlSecureZeroMemory(guest_state_.msr_bitmap_virtual_address, PAGE_SIZE);
 
     if (guest_state_.msr_bitmap_virtual_address == nullptr)
     {
@@ -292,7 +295,7 @@ namespace hh
 
     if (vmxon_region == nullptr)
     {
-      throw std::exception{ "Failed to allocate buffer for VMXON region.\n" };
+      throw std::exception{ "Failed to allocate buffer for VMXON region." };
     }
 
     uint64_t vmxon_physical_address = common::virtual_address_to_physical_address(vmxon_region);
@@ -319,7 +322,8 @@ namespace hh
 
     if (vmxon_status)
     {
-      throw std::exception{ "Executing VMXON instruction failed with status %d" };
+      KdPrint(("VMXON status = %d\n"));
+      throw std::exception{ "Executing VMXON instruction failed." };
     }
 
     guest_state_.vmxon_region_physical_address = aligned_vmxon_physical_address;

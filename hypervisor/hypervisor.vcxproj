@@ -155,6 +155,9 @@
       <AdditionalDependencies>Zydis.lib;libcntpr.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EntryPointSymbol>entry_point</EntryPointSymbol>
     </Link>
+    <DriverSign>
+      <AdditionalOptions>/fd SHA256 %(AdditionalOptions)</AdditionalOptions>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -169,6 +172,9 @@
       <AdditionalDependencies>Zydis.lib;libcntpr.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EntryPointSymbol>entry_point</EntryPointSymbol>
     </Link>
+    <DriverSign>
+      <AdditionalOptions>/fd SHA256 %(AdditionalOptions)</AdditionalOptions>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
@@ -185,8 +191,8 @@
     <ClCompile Include="invept.cpp" />
     <ClCompile Include="lde.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="memory_manager.cpp" />
-    <ClCompile Include="pt_handler.cpp" />
+    <ClCompile Include="ept_handler.cpp" />
+    <ClCompile Include="tlsf.c" />
     <ClCompile Include="type_info.cpp" />
     <ClCompile Include="vcpu.cpp" />
     <ClCompile Include="vmexit_handler.cpp" />
@@ -212,8 +218,9 @@
     <ClInclude Include="lde.hpp" />
     <ClInclude Include="memory_manager.hpp" />
     <ClInclude Include="msr.hpp" />
-    <ClInclude Include="pt_handler.hpp" />
+    <ClInclude Include="ept_handler.hpp" />
     <ClInclude Include="segment.hpp" />
+    <ClInclude Include="tlsf.h" />
     <ClInclude Include="type_info.hpp" />
     <ClInclude Include="vcpu.hpp" />
     <ClInclude Include="vmcall.hpp" />

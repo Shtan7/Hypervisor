@@ -8,11 +8,12 @@
 #include "vmcall.hpp"
 #include "x86-64.hpp"
 #include "vmexit_handler.hpp"
-#include "pt_handler.hpp"
+#include "ept_handler.hpp"
 #include "vcpu.hpp"
 #include "memory_manager.hpp"
 #include "cpp_support.hpp"
 #include "hooking.hpp"
+#include <atomic>
 
 namespace hh
 {
@@ -20,7 +21,7 @@ namespace hh
   {
     is_vmx_supported();
 
-    globals::pt_handler = new ept::pt_handler;
+    globals::pt_handler = new ept::ept_handler{};
     std::shared_ptr<hv_event_handlers::vmexit_handler> vmexit_handler = std::make_shared<hv_event_handlers::kernel_hook_assistant>();
 
     globals::pt_handler->initialize_ept();
@@ -29,30 +30,30 @@ namespace hh
 
     for (int j = globals::processor_count; j--;)
     {
-      new(&globals::vcpus[j]) vcpu(vmexit_handler);
+      new (&globals::vcpus[j]) vcpu(vmexit_handler);
     }
 
-    globals::hook_builder = new hook::hook_builder;
+    globals::hook_builder = new hook::hook_builder{};
 
-    bool dpc_status = true;
-    std::pair<vcpu*, bool&> dpc_argument = { globals::vcpus, dpc_status };
+    std::atomic<bool> dpc_status = true;
+    std::pair<vcpu*, std::atomic<bool>&> dpc_argument = { globals::vcpus, dpc_status };
 
     // Allocate required structures and run vmxon on all logical cores
     KeGenericCallDpc([](PKDPC dpc, PVOID arg, PVOID system_argument_1, PVOID system_argument_2)
       {
         const int processor_id = KeGetCurrentProcessorNumber();
 
-        auto* dpc_argument = reinterpret_cast<std::pair<vcpu*, bool&>*>(arg);
-        auto& current_cpu = dpc_argument->first[processor_id];
+        auto [vcpus, dpc_status_inner] = *static_cast<std::pair<vcpu*, std::atomic<bool>&>*>(arg);
+        auto& current_vcpu = vcpus[processor_id];
 
         try
         {
-          current_cpu.initialize_guest();
+          current_vcpu.initialize_guest();
         }
         catch (std::exception& e)
         {
           KdPrint(("%s\n", e.what()));
-          dpc_argument->second = false;
+          dpc_status_inner = false;
         }
 
         // Wait for all DPCs to synchronize at this point
@@ -76,12 +77,12 @@ namespace hh
 
   void hv_operations::is_vmx_supported()
   {
-    common::cpuid_t data = {};
+    common::cpuid_eax_01 data = {};
     x86::msr::feature_control_msr_t feature_control_msr = x86::msr::read<x86::msr::feature_control_msr_t>();
 
-    __cpuid(reinterpret_cast<int*>(&data), 1);
+    __cpuid(reinterpret_cast<int*>(data.cpu_info), 1);
 
-    if (data.ecx & (1 << 5) == 0) // if CPUID.1:ECX.VMX[bit 5] = 1, then VMX operation is supported
+    if (data.feature_information_ecx.virtual_machine_extensions == 0)
     {
       throw std::exception{ "VMX operation is not supported: CPUID.1:ECX.VMX[bit 5] = 0." };
     }
@@ -109,11 +110,6 @@ namespace hh
 
     if (globals::vcpus != nullptr)
     {
-      for (int j = 0; j < globals::processor_count; j++)
-      {
-        globals::vcpus[j].~vcpu();
-      }
-
       delete[] globals::vcpus;
     }
 
@@ -124,8 +120,8 @@ namespace hh
 
     if (globals::mem_manager != nullptr)
     {
-      globals::mem_manager = nullptr;
       delete globals::mem_manager;
+      globals::mem_manager = nullptr;
     }
 
     __crt_deinit();

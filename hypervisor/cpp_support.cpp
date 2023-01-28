@@ -1,5 +1,6 @@
 #include <ntifs.h>
 #include <exception>
+#include <stdexcept>
 #include "memory_manager.hpp"
 #include "globals.hpp"
 #include "common.hpp"
@@ -179,7 +180,11 @@ void* __cdecl operator new(size_t size)
     pointer = ExAllocatePoolWithTag(NonPagedPool, size, common::pool_tag);
   }
 
-  if (pointer) RtlZeroMemory(pointer, size);
+  if (pointer == nullptr)
+  {
+    throw std::bad_alloc{};
+  }
+
   return pointer;
 }
 
@@ -196,7 +201,11 @@ void* __cdecl operator new(size_t size, std::align_val_t align)
     pointer = ExAllocatePoolWithTag(NonPagedPool, size, common::pool_tag);
   }
 
-  if (pointer) RtlZeroMemory(pointer, size);
+  if (pointer == nullptr)
+  {
+    throw std::bad_alloc{};
+  }
+
   return pointer;
 }
 
@@ -213,7 +222,11 @@ void* __cdecl operator new[](size_t size)
     pointer = ExAllocatePoolWithTag(NonPagedPool, size, common::pool_tag);
   }
 
-  if (pointer) RtlZeroMemory(pointer, size);
+  if (pointer == nullptr)
+  {
+    throw std::bad_alloc{};
+  }
+
   return pointer;
 }
 
@@ -230,12 +243,21 @@ void* __cdecl operator new[](size_t size, std::align_val_t align)
     pointer = ExAllocatePoolWithTag(NonPagedPool, size, common::pool_tag);
   }
 
-  if (pointer) RtlZeroMemory(pointer, size);
+  if (pointer == nullptr)
+  {
+    throw std::bad_alloc{};
+  }
+
   return pointer;
 }
 
 void __cdecl operator delete(void* pointer)
 {
+  if(pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -249,6 +271,12 @@ void __cdecl operator delete(void* pointer)
 void __cdecl operator delete(void* pointer, std::align_val_t align)
 {
   UNREFERENCED_PARAMETER(align);
+
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -262,6 +290,12 @@ void __cdecl operator delete(void* pointer, std::align_val_t align)
 void __cdecl operator delete(void* pointer, size_t size)
 {
   UNREFERENCED_PARAMETER(size);
+
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -276,6 +310,12 @@ void __cdecl operator delete(void* pointer, size_t size, std::align_val_t align)
 {
   UNREFERENCED_PARAMETER(size);
   UNREFERENCED_PARAMETER(align);
+
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -288,6 +328,11 @@ void __cdecl operator delete(void* pointer, size_t size, std::align_val_t align)
 
 void __cdecl operator delete[](void* pointer)
 {
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -301,6 +346,12 @@ void __cdecl operator delete[](void* pointer)
 void __cdecl operator delete[](void* pointer, std::align_val_t align)
 {
   UNREFERENCED_PARAMETER(align);
+
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -314,6 +365,12 @@ void __cdecl operator delete[](void* pointer, std::align_val_t align)
 void __cdecl operator delete[](void* pointer, size_t size)
 {
   UNREFERENCED_PARAMETER(size);
+
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -328,6 +385,12 @@ void __cdecl operator delete[](void* pointer, size_t size, std::align_val_t alig
 {
   UNREFERENCED_PARAMETER(size);
   UNREFERENCED_PARAMETER(align);
+
+  if (pointer == nullptr)
+  {
+    return;
+  }
+
   if (globals::mem_manager != nullptr)
   {
     globals::mem_manager->deallocate(pointer);
@@ -348,7 +411,7 @@ static void RaiseException(ULONG BugCheckCode)
 [[noreturn]]
 void __cdecl _invalid_parameter_noinfo_noreturn()
 {
-  RaiseException(DRIVER_INVALID_CRUNTIME_PARAMETER);
+  throw std::invalid_argument{ "Invalid argument has been passed to CRT function." };
 }
 
 namespace std
@@ -356,43 +419,43 @@ namespace std
   [[noreturn]]
   void __cdecl _Xbad_alloc()
   {
-    RaiseException(INSTALL_MORE_MEMORY);
+    throw std::bad_alloc{};
   }
 
   [[noreturn]]
-  void __cdecl _Xinvalid_argument(_In_z_ const char*)
+  void __cdecl _Xinvalid_argument(_In_z_ const char* m_str)
   {
-    RaiseException(DRIVER_INVALID_CRUNTIME_PARAMETER);
+    throw std::invalid_argument{ m_str };
   }
 
   [[noreturn]]
-  void __cdecl _Xlength_error(_In_z_ const char*)
+  void __cdecl _Xlength_error(_In_z_ const char* m_str)
   {
-    RaiseException(KMODE_EXCEPTION_NOT_HANDLED);
+    throw std::length_error{ m_str };
   }
 
   [[noreturn]]
-  void __cdecl _Xout_of_range(_In_z_ const char*)
+  void __cdecl _Xout_of_range(_In_z_ const char* m_str)
   {
-    RaiseException(DRIVER_OVERRAN_STACK_BUFFER);
+    throw std::out_of_range{ m_str };
   }
 
   [[noreturn]]
-  void __cdecl _Xoverflow_error(_In_z_ const char*)
+  void __cdecl _Xoverflow_error(_In_z_ const char* m_str)
   {
-    RaiseException(DRIVER_OVERRAN_STACK_BUFFER);
+    throw overflow_error{ m_str };
   }
 
   [[noreturn]]
-  void __cdecl _Xruntime_error(_In_z_ const char*)
+  void __cdecl _Xruntime_error(_In_z_ const char* m_str)
   {
-    RaiseException(KMODE_EXCEPTION_NOT_HANDLED);
+    throw std::runtime_error{ m_str };
   }
 
   [[noreturn]]
-  void __cdecl RaiseHandler(const std::exception&)
+  void __cdecl RaiseHandler(const std::exception& e)
   {
-    RaiseException(KMODE_EXCEPTION_NOT_HANDLED);
+    throw e;
   }
 
   _Prhand _Raise_handler = &RaiseHandler;
@@ -414,6 +477,20 @@ void __cdecl _invoke_watson(
 
   KdBreakPoint();
   RaiseException(KMODE_EXCEPTION_NOT_HANDLED);
+}
+
+extern "C" void __cdecl _wassert(
+  _In_z_ wchar_t const* _Message,
+  _In_z_ wchar_t const* _File,
+  _In_   unsigned       _Line
+)
+{
+  KdPrint(("Assert conditions has been false.\n"
+    "%wZ\n"
+    "%wZ\n"
+    "Line: %d\n", _Message, _File, _Line));
+
+  __int2c();
 }
 
 // For <unordered_set> and <unordered_map> support:
