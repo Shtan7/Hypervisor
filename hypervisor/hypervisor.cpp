@@ -120,8 +120,12 @@ namespace hh
 
     if (globals::mem_manager != nullptr)
     {
-      delete globals::mem_manager;
+      globals::mem_manager->~memory_manager();
+
+      auto* temp_ptr = globals::mem_manager;
       globals::mem_manager = nullptr;
+
+      operator delete (temp_ptr);
     }
 
     __crt_deinit();
