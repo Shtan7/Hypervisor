@@ -7,15 +7,13 @@ Hypervisor - это гипервизор второго типа, который
 процессор с поддержкой vt-x и ept технологий.
 
 Теоретический функционал и возможности подобной программы весьма обширны: 
-- Перехват широкого списка ассемблерных инструкций с полной возможностью
+- Перехват широкого списка процессорных инструкций с полной возможностью
 кастомизации их поведения. В качестве примера можно привести перехват RDMSR,
 который позволит контролировать видимое содержимое регистра для гостевой системы;
 - Перехват исключений процессора;
-- Возможность инжекта исключений процессора;
+- Возможность инжекта исключений процессора и прерываний;
 - Возможность установки невидимых брейкпоинтов на запись, чтение, исполнение;
-- Возможность установки невидимых хуков исполнямого кода. Данная фича реализована
-и используется в проекте для хукинга ядерных функций системы без триггера BSOD'а
-от Patch Guard'а. 
+- Возможность установки невидимых хуков исполнямого кода. POC данной фичи продемонстрирован в проекте на примере хука функции NtCreateFile без триггера Patch Guard. 
 
 ## Особенности реализации проекта.
 
@@ -52,8 +50,7 @@ Hypervisor - это гипервизор второго типа, который
 
 Для демонстрации EPT хука в main.cpp в setup_hooks происходит хук SSDT функции 'NtCreateFile'.
 Оригинальная функция подменяется хукнутой, в которой осуществляется проверка имени открываемого
-объекта. Если имя содержит в себе подстроку 'open_me', то будет вовзращен статус 'ACCESS_DENIED',
-а при открытии, например, файла с данной подстрокой в имени, будет выдана ошибка доступа.
+объекта. Если имя содержит в себе подстроку 'open_me', то будет вовзращен статус 'ACCESS_DENIED'.
 
 ## Сборка проекта.
 
@@ -65,53 +62,51 @@ WDK еще не портирован для Visual Studio 2022.
 
 # Hypervisor : EN
 
-## Brief description.
+## A brief description.
 
 Hypervisor is a type 2 hypervisor that virtualizes an already running system. To run this hypervisor, 
-you need a Windows 10 system, as well as an Intel processor with vt-x and ept support.
+you need the Windows 10 system, as well as an Intel processor with vt-x and ept support.
 
 The theoretical functionality and capabilities of the program are very extensive:
-- Interception of a wide list of assembler instructions with full customization of their behavior. 
-An example is the RDMSR intercept, which will allow you to control the visible contents of the register 
-for the guest system.
+- Interception of a wide list of cpu instructions with a full customization of their behavior. 
+An example is the RDMSR intercept which allows you to control the visible contents of the register 
+for a guest system.
 - Interception of processor exceptions;
-- Ability to inject processor exceptions;
-- Ability to set stealth breakpoints for writing, reading, execution;
-- Ability to install stealth hooks of the executable code. This feature is implemented and used in the 
-project for hooking the kernel functions of the system without the BSOD trigger from Patch Guard.
+- The ability to inject processor exceptions or interrupts;
+- The ability to set stealth breakpoints for writing, reading, execution;
+- The ability to install stealth hooks of the executable code. POC of this feature is implemented as a hook of the NtCreateFile function, and this hook doesn't trigger Patch Guard.
 
 ## Features of the project implementation.
 
-This project uses the C++ port of exceptions. The minimum necessary functionality is also implemented, 
-which ensures the full operation of a large part of the C++ standard library. At least STL is supported.
+This project uses the C++ runtime port which allows you to use C++ exceptions and a big part of the C++ standart library. At least, you can use STL.
 
 Links to repositories from which the port of C++ exceptions was taken:
 - https://github.com/DymOK93/KTL
 - https://github.com/avakar/vcrtl
 
-You can't use standard ways of memory allocation in hypervisor root mode, so simple memory 
-allocator was implemented. Allocator uses 'TLSF allocator' algorithm.
+You can't use standard ways of memory allocation in the hypervisor root mode, so a simple memory 
+allocator was implemented. The allocator uses the 'TLSF allocator' algorithm.
 
 The project generates an executable image that can be run using manual mapping.
-This imposes certain restrictions on the code. You can't create device object for I\O operations 
-with user mode. This can be fixed with a SSDT hook which will allow you to perform connection
-with user mode using a simple SYSCALL instruction. The benefits of this approach include the ability 
-to use the hypervisor without having to put Windows into test mode, where drivers can be loaded without digital sign.
+This imposes certain restrictions on the code. You can't create a device object for I\O operations 
+with user mode. This can be fixed with a SSDT hook which will allow you to perform a connection
+with user mode using the simple SYSCALL instruction. The benefits of this approach include the ability 
+to use the hypervisor without having to put Windows into the test mode, where drivers can be loaded without the digital sign.
 
 ## About stealth hooks of executable code.
 
 To implement this feature, MMIO emulation with EPT is used. A copy with a hook is created for the original page.
-Hypervisor clears the target page's read and write bits and replaces it with the clone. Such a page can be freely 
-executed, but not read. When Patch Guard checks the integrity of the kernel a read is attempted and an EPT violation 
+Hypervisor clears the target PFN read and write bits and replaces it with the clone. Such a page can be freely 
+executed, but not read or written. When Patch Guard checks the integrity of the kernel a read is attempted and the EPT violation 
 occurs. After that, the hypervisor temporarily replaces the changed page with the original one. Thus, one virtual 
 address leads to different physical addresses in different conditions.
 
-In main.cpp you can find example of this technique. setup_hooks performs hook of the SSDT function 'NtCreateFile'.
-New function checks object's name. If it contains substring 'open_me' then function returns status 'ACCESS_DENIED'.
+In main.cpp you can find example of this technique. setup_hooks performs the hook of the SSDT function 'NtCreateFile'.
+The new function checks an object's name. If it contains substring 'open_me' then the function returns status 'ACCESS_DENIED'.
 If you open a file with this substring in the name, you will get an access error.
 
-## Project build.
+## The project build.
 
-For a successful build, you need to recursively clone the repository. Next, you need to build the Zydis with
+For a successful build, you need to recursively clone the repository. Next, you need to build Zydis with the
 Visual Studio project which path is '\zydis\msvc\Zydis.sln'. You also need to have WDK and Visual Studio 2019 installed.
-Visual Studio 2019 because the WDK has not been ported to Visual Studio 2022 at the time of writing the readme.
+Visual Studio 2019 because WDK wasn't ported to Visual Studio 2022 at the time of writing the readme.
