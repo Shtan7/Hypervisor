@@ -185,6 +185,12 @@
     <ClCompile Include="exc_common.cpp" />
     <ClCompile Include="exc_dispatch.cpp" />
     <ClCompile Include="fh4.cpp" />
+    <ClCompile Include="fx_state_saver.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Disabled</Optimization>
+      <FavorSizeOrSpeed Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Neither</FavorSizeOrSpeed>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NoExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NoExtensions</EnableEnhancedInstructionSet>
+    </ClCompile>
     <ClCompile Include="hooking.cpp" />
     <ClCompile Include="hook_functions.cpp" />
     <ClCompile Include="hypervisor.cpp" />

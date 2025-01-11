@@ -11,17 +11,6 @@
 
 namespace hh::hv_event_handlers
 {
-  vmexit_handler::fx_state_saver::fx_state_saver(common::fxsave_area* ptr) noexcept : fxsave_area{ ptr }
-  {
-    *fxsave_area = common::fxsave_area{};
-    _fxsave64(fxsave_area);
-  }
-
-  vmexit_handler::fx_state_saver::~fx_state_saver() noexcept
-  {
-    _fxrstor64(fxsave_area);
-  }
-
   bool vmexit_handler::handlers_dispatcher(common::guest_regs* regs) noexcept
   {
     vcpu* current_vcpu = &globals::vcpus[KeGetCurrentProcessorNumber()];
@@ -542,7 +531,7 @@ namespace hh::hv_event_handlers
 
     try
     {
-      hooked_page = globals::hook_builder->get_hooked_page_info(guest_physical_address);
+      hooked_page = globals::hook_builder->get_hooked_page_info(reinterpret_cast<uint64_t>(PAGE_ALIGN(guest_physical_address)));
     }
     catch(...)
     {

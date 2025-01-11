@@ -71,6 +71,9 @@
     <ClCompile Include="tlsf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="fx_state_saver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="exc_common.hpp">
